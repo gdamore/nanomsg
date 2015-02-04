@@ -57,18 +57,17 @@
 #include "../../pipeline.h"
 #include "../../bus.h"
 
-#define PROTO_NAME(s)	s ".sp.nanomsg.org"
 static const struct nn_ws_sp_map NN_WS_HANDSHAKE_SP_MAP[] = {
-        { NN_PAIR,	 NN_PAIR,       PROTO_NAME("pair") },
-        { NN_REQ,	 NN_REP,	PROTO_NAME("req") },
-        { NN_REP,        NN_REQ,	PROTO_NAME("rep") },
-        { NN_PUB,	 NN_SUB,	PROTO_NAME("pub") },
-        { NN_SUB,	 NN_PUB,	PROTO_NAME("sub") },
-        { NN_SURVEYOR,	 NN_RESPONDENT,	PROTO_NAME("surveyor") },
-        { NN_RESPONDENT, NN_SURVEYOR,	PROTO_NAME("respondent") },
-        { NN_PUSH,	 NN_PULL,	PROTO_NAME("push") },
-        { NN_PULL,	 NN_PUSH,	PROTO_NAME("pull") },
-        { NN_BUS,	 NN_BUS,	PROTO_NAME("bus") }
+    { NN_PAIR,       NN_PAIR,       "pair.sp.nanomsg.org" },
+    { NN_REQ,        NN_REP,        "req.sp.nanomsg.org" },
+    { NN_REP,        NN_REQ,        "rep.sp.nanomsg.org" },
+    { NN_PUB,        NN_SUB,        "pub.sp.nanomsg.org" },
+    { NN_SUB,        NN_PUB,        "sub.sp.nanomsg.org" },
+    { NN_SURVEYOR,   NN_RESPONDENT, "surveyor.sp.nanomsg.org" },
+    { NN_RESPONDENT, NN_SURVEYOR,   "respondent.sp.nanomsg.org" },
+    { NN_PUSH,       NN_PULL,       "push.sp.nanomsg.org" },
+    { NN_PULL,       NN_PUSH,       "pull.sp.nanomsg.org" },
+    { NN_BUS,        NN_BUS,        "bus.sp.nanomsg.org" }
 };
 
 const size_t NN_WS_HANDSHAKE_SP_MAP_LEN = sizeof (NN_WS_HANDSHAKE_SP_MAP) /
