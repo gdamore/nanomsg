@@ -1,12 +1,12 @@
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_FULL_BINDIR@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
 Name: Nanomsg
 Description: nanomsg library is a high-performance implementation of several scalability protocols.
 URL: http://nanomsg.org/
 Version: @NN_ABI_VERSION@
 Requires:
-Libs: -L${libdir} -lnanomsg @LIBS@
-Cflags: -I${includedir}
+Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lnanomsg
+Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@

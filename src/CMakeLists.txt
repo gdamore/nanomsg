@@ -1,6 +1,7 @@
 #
 #   Copyright (c) 2012-2013 Martin Sustrik  All rights reserved.
 #   Copyright (c) 2013 GoPivotal, Inc.  All rights reserved.
+#   Copyright 2015 Garrett D'Amore <garrett@damore.org>
 #
 #   Permission is hereby granted, free of charge, to any person obtaining a copy
 #   of this software and associated documentation files (the "Software"),
@@ -290,7 +291,8 @@ if (WIN32)
 endif ()
 
 add_library (nanomsg SHARED ${NN_SOURCES})
-set_target_properties (nanomsg PROPERTIES SOVERSION 0 VERSION 2.1.2)
+set_target_properties (nanomsg PROPERTIES
+    SOVERSION ${NN_VERSION_CURRENT} VERSION ${NN_ABI_VERSION})
 
 add_definitions (-DNN_EXPORTS)
 
@@ -299,6 +301,8 @@ if (WIN32)
     target_link_libraries (nanomsg Mswsock.lib)
     target_link_libraries (nanomsg Advapi32.lib)
 endif ()
+
+target_link_libraries (nanomsg ${EXTRA_LIBS})
 
 install(TARGETS nanomsg
     ARCHIVE DESTINATION lib

@@ -29,9 +29,32 @@ include (CheckFunctionExists)
 include (CheckSymbolExists)
 include (CheckCSourceCompiles)
 include (CheckStructHasMember)
+include (GNUInstallDirs)
 
 project (nanomsg LANGUAGES C)
 enable_testing ()
+
+# Determine our ABI version
+file (READ src/nn.h NN_H)
+
+string (REGEX MATCH "NN_VERSION_CURRENT ([0-9]+)" TMP0 ${NN_H})
+string (REGEX REPLACE "NN_VERSION_CURRENT +" "" NN_VERSION_CURRENT ${TMP0})
+
+string (REGEX MATCH "NN_VERSION_REVISION ([0-9]+)" TMP0 ${NN_H})
+string (REGEX REPLACE "NN_VERSION_REVISION +" "" NN_VERSION_REVISION ${TMP0})
+
+string (REGEX MATCH "NN_VERSION_AGE ([0-9]+)" TMP0 ${NN_H})
+string (REGEX REPLACE "NN_VERSION_AGE +" "" NN_VERSION_AGE ${TMP0})
+set (NN_ABI_VERSION ${NN_VERSION_CURRENT}.${NN_VERSION_REVISION}.${NN_VERSION_AGE})
+
+set (CMAKE_SKIP_BUILD_RPATH FALSE)
+set (CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+#set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set (CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+list (FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+if ("${isSystemDir}" STREQUAL "-1")
+	set (CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+endif ()
 
 #  Platform checks.
 
@@ -50,41 +73,47 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "SunOS" )
     add_definitions (-DNN_HAVE_SOLARIS)
 endif ()
 
+# Should be harmless on everything that doesn't use it.  Needed on some
+# platforms.
+add_definitions (-D_REENTRANT)
+
 # Feature checks.
 macro (NN_CHECK_INC HEADER DEF)
 	check_include_files (${HEADER} ${DEF})
 	if (${DEF})
-		add_definitions (-D${DEF})
+		add_definitions (-D${DEF}=1)
 	endif ()
 endmacro (NN_CHECK_INC)
 
 macro (NN_CHECK_LIB LIB SYM DEF)
 	check_library_exists (${LIB} ${SYM} "" ${DEF})
 	if (${DEF})
-		add_definitions (-D${DEF})
+		add_definitions (-D${DEF}=1)
 		set (EXTRA_LIBS ${EXTRA_LIBS} ${LIB})
 		# add_link_libraries
 	endif ()
 endmacro (NN_CHECK_LIB)
 
 macro (NN_CHECK_FUNC NAME DEF)
+	set (CMAKE_REQUIRED_LIBRARIES ${EXTRA_LIBS})
 	check_function_exists (${NAME} ${DEF})
+	
 	if (${DEF})
-		add_definitions (-D${DEF})
+		add_definitions (-D${DEF}=1)
 	endif ()
 endmacro (NN_CHECK_FUNC)
 
 macro (NN_CHECK_SYM SYM HEADER DEF)
 	check_symbol_exists (${SYM} ${HEADER} ${DEF})
 	if (${DEF})
-		add_definitions (-D${DEF})
+		add_definitions (-D${DEF}=1)
 	endif ()
 endmacro (NN_CHECK_SYM)
 
 macro (NN_CHECK_MEMBER STR MEM HEADER DEF)
 	check_struct_has_member (${STR} ${MEM} ${HEADER} ${DEF})
 	if (${DEF})
-		add_definitions (-D${DEF})
+		add_definitions (-D${DEF}=1)
 	endif ()
 endmacro (NN_CHECK_MEMBER)
 
@@ -117,48 +146,41 @@ nn_check_func (sem_wait			NN_HAVE_SEMAPHORE)
 nn_check_func (accept4			NN_HAVE_ACCEPT4)
 nn_check_func (getifaddrs		NN_HAVE_GETIFADDRS)
 
+nn_check_func(atomic_add_32_nv 		NN_ATOMIC_SOLARIS)
+nn_check_func(__sync_fetch_and_sub	NN_ATOMIC_GCC_BUILTINS)
+
 nn_check_sym (CLOCK_MONOTONIC time.h	NN_HAVE_CLOCK_MONTONIC)
 nn_check_sym (SIOCGIFADDR sys/ioctl.h	NN_HAVE_SIOCGIFADDR)
 
-# GCC_ATOMIC_BULTINS
-# Solaris ATOMICS (sys/atomic.h)
-
 nn_check_member ("struct msghdr" msg_control sys/socket.h NN_HAVE_MSG_CONTROL)
-
-#xcheck_c_source_compiles("#include <sys/socket.h>
-#xint main(int argc, char **argv) { struct msghdr hdr; hdr.msg_control = 0; }
-#" NN_HAVE_MSG_CONTROL)
-#if (${NN_HAVE_MSG_CONTROL})
-#	add_definitions (-DNN_HAVE_MSG_CONTROL)
-#xendif ()
 
 # Select the polling mechanism
 if (${NN_HAVE_EPOLL})
-	add_definitions (-DNN_USE_EPOLL)
+	add_definitions (-DNN_USE_EPOLL=1)
 elseif (${NN_HAVE_KQUEUE})
-	add_definitions (-DNN_USE_KQUEUE)
+	add_definitions (-DNN_USE_KQUEUE=1)
 elseif (${NN_HAVE_POLL})
-	add_definitions (-DNN_USE_POLL)
+	add_definitions (-DNN_USE_POLL=1)
 else ()
     message (WARNING "ERROR: No suitable polling mechanism found.")
 endif ()
 
 # Select the interface mechanism
 if (${NN_HAVE_GETIFADDRS})
-	add_definitions (-DNN_USE_IFADDRS)
+	add_definitions (-DNN_USE_IFADDRS=1)
 elseif (${NN_HAVE_SIOCGIFADDR})
-	add_definitions (-DNN_USE_SIOCGIFADDR)
+	add_definitions (-DNN_USE_SIOCGIFADDR=1)
 else ()
-	add_definitions (-DNN_USE_LITERAL_IFADDR)
+	add_definitions (-DNN_USE_LITERAL_IFADDR=1)
 endif ()
 
 # Selct event mechanism
 if (${NN_HAVE_EVENTFD})
-	add_definitions (-DNN_USE_EVENTFD)
+	add_definitions (-DNN_USE_EVENTFD=1)
 elseif (${NN_HAVE_PIPE})
-	add_definitions (-DNN_USE_PIPE)
+	add_definitions (-DNN_USE_PIPE=1)
 elseif (${NN_HAVE_SOCKETPAIR})
-	add_definitions (-DNN_USE_SOCKETPAIR)
+	add_definitions (-DNN_USE_SOCKETPAIR=1)
 endif ()
 
 #  Build the library itself.
@@ -249,6 +271,9 @@ install (FILES src/survey.h DESTINATION include/nanomsg)
 install (FILES src/bus.h DESTINATION include/nanomsg)
 
 install (TARGETS nanocat RUNTIME DESTINATION bin)
+
+configure_file(libnanomsg.pc.in libnanomsg.pc)
+install(FILES ${CMAKE_BINARY_DIR}/libnanomsg.pc DESTINATION lib/pkgconfig)
 
 set (CPACK_GENERATOR "NSIS")
 set (CPACK_PACKAGE_NAME "nanomsg")
