@@ -1,7 +1,7 @@
-Welcome to nanomsg
+Welcome to nanomsg <a href=nanonmsg.jpg align=right>
 ------------------
 
-nanomsg library is a simple high-performance implementation of several 
+The nanomsg library is a simple high-performance implementation of several 
 "scalability protocols". Scalability protocol's job is to define how multiple 
 applications communicate to form a single distributed application.
 
