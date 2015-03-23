@@ -290,13 +290,15 @@ if (WIN32)
 endif ()
 
 add_library (nanomsg SHARED ${NN_SOURCES})
+set_target_properties (nanomsg PROPERTIES SOVERSION 0 VERSION 2.1.2)
 
 add_definitions (-DNN_EXPORTS)
-add_definitions (-DNN_USE_LITERAL_IFADDR)
 
-target_link_libraries (nanomsg ws2_32)
-target_link_libraries (nanomsg Mswsock.lib)
-target_link_libraries (nanomsg Advapi32.lib)
+if (WIN32)
+    target_link_libraries (nanomsg ws2_32)
+    target_link_libraries (nanomsg Mswsock.lib)
+    target_link_libraries (nanomsg Advapi32.lib)
+endif ()
 
 install(TARGETS nanomsg
     ARCHIVE DESTINATION lib

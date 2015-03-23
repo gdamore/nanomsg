@@ -1,6 +1,7 @@
 #
 #   Copyright (c) 2012 Martin Sustrik  All rights reserved.
 #   Copyright (c) 2013 GoPivotal, Inc.  All rights reserved.
+#   Copyright 2015 Garrett D'Amore <garrett@damore.org>
 #
 #   Permission is hereby granted, free of charge, to any person obtaining a copy
 #   of this software and associated documentation files (the "Software"),
@@ -21,12 +22,15 @@
 #   IN THE SOFTWARE.
 #
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.12)
 include (CheckIncludeFiles)
+include (CheckLibraryExists)
+include (CheckFunctionExists)
 include (CheckSymbolExists)
 include (CheckCSourceCompiles)
+include (CheckStructHasMember)
 
-project (nanomsg C)
+project (nanomsg LANGUAGES C)
 enable_testing ()
 
 #  Platform checks.
@@ -36,10 +40,125 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     add_definitions (-D_CRT_SECURE_NO_WARNINGS)
 
     if (MINGW)
-        add_definitions (-DNN_HAVE_MINGW -DNN_HAVE_STDINT -D_WIN32_WINNT=0x0600)
+        add_definitions (-DNN_HAVE_MINGW -D_WIN32_WINNT=0x0600)
     endif ()
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    add_definitions (-DNN_HAVE_OSX)
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux" )
+    add_definitions (-DNN_HAVE_LINUX)
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "SunOS" )
+    add_definitions (-DNN_HAVE_SOLARIS)
+endif ()
+
+# Feature checks.
+macro (NN_CHECK_INC HEADER DEF)
+	check_include_files (${HEADER} ${DEF})
+	if (${DEF})
+		add_definitions (-D${DEF})
+	endif ()
+endmacro (NN_CHECK_INC)
+
+macro (NN_CHECK_LIB LIB SYM DEF)
+	check_library_exists (${LIB} ${SYM} "" ${DEF})
+	if (${DEF})
+		add_definitions (-D${DEF})
+		set (EXTRA_LIBS ${EXTRA_LIBS} ${LIB})
+		# add_link_libraries
+	endif ()
+endmacro (NN_CHECK_LIB)
+
+macro (NN_CHECK_FUNC NAME DEF)
+	check_function_exists (${NAME} ${DEF})
+	if (${DEF})
+		add_definitions (-D${DEF})
+	endif ()
+endmacro (NN_CHECK_FUNC)
+
+macro (NN_CHECK_SYM SYM HEADER DEF)
+	check_symbol_exists (${SYM} ${HEADER} ${DEF})
+	if (${DEF})
+		add_definitions (-D${DEF})
+	endif ()
+endmacro (NN_CHECK_SYM)
+
+macro (NN_CHECK_MEMBER STR MEM HEADER DEF)
+	check_struct_has_member (${STR} ${MEM} ${HEADER} ${DEF})
+	if (${DEF})
+		add_definitions (-D${DEF})
+	endif ()
+endmacro (NN_CHECK_MEMBER)
+
+
+nn_check_inc (netinet/in.h		NN_HAVE_INET_IN)
+nn_check_inc (netdb.h			NN_HAVE_NETDB)
+nn_check_inc (unistd.h			NN_HAVE_UNISTD)
+nn_check_inc (sys/socket.h		NN_HAVE_SYS_SOCKET)
+nn_check_inc (sys/ioctl.h		NN_HAVE_SYS_IOCTL)
+nn_check_inc (stdint.h			NN_HAVE_STDINT)
+nn_check_inc (inttypes.h		NN_HAVE_INTTYPES)
+
+nn_check_lib (socket socket 		NN_HAVE_LIBSOCKET)
+nn_check_lib (nsl gethostent 		NN_HAVE_LIBNSL)
+nn_check_lib (pthread pthread_create	NN_HAVE_PTHREAD)
+nn_check_lib (rt clock_gettime		NN_HAVE_RT)
+nn_check_lib (anl getaddrinfo_a 	NN_HAVE_GETADDRINFO_A)
+
+nn_check_func (eventfd			NN_HAVE_EVENTFD)
+nn_check_func (pipe			NN_HAVE_PIPE)
+nn_check_func (pipe2			NN_HAVE_PIPE2)
+nn_check_func (gethrtime		NN_HAVE_GETHRTIME)
+
+nn_check_func (poll			NN_HAVE_POLL)
+nn_check_func (epoll_create		NN_HAVE_EPOLL)
+nn_check_func (kqueue			NN_HAVE_KQUEUE)
+
+nn_check_func (socketpair		NN_HAVE_SOCKETPAIR)
+nn_check_func (sem_wait			NN_HAVE_SEMAPHORE)
+nn_check_func (accept4			NN_HAVE_ACCEPT4)
+nn_check_func (getifaddrs		NN_HAVE_GETIFADDRS)
+
+nn_check_sym (CLOCK_MONOTONIC time.h	NN_HAVE_CLOCK_MONTONIC)
+nn_check_sym (SIOCGIFADDR sys/ioctl.h	NN_HAVE_SIOCGIFADDR)
+
+# GCC_ATOMIC_BULTINS
+# Solaris ATOMICS (sys/atomic.h)
+
+nn_check_member ("struct msghdr" msg_control sys/socket.h NN_HAVE_MSG_CONTROL)
+
+#xcheck_c_source_compiles("#include <sys/socket.h>
+#xint main(int argc, char **argv) { struct msghdr hdr; hdr.msg_control = 0; }
+#" NN_HAVE_MSG_CONTROL)
+#if (${NN_HAVE_MSG_CONTROL})
+#	add_definitions (-DNN_HAVE_MSG_CONTROL)
+#xendif ()
+
+# Select the polling mechanism
+if (${NN_HAVE_EPOLL})
+	add_definitions (-DNN_USE_EPOLL)
+elseif (${NN_HAVE_KQUEUE})
+	add_definitions (-DNN_USE_KQUEUE)
+elseif (${NN_HAVE_POLL})
+	add_definitions (-DNN_USE_POLL)
 else ()
-    message (FATAL_ERROR "ERROR: CMake build system is intended only to generate MSVC solution files.\nUse autotools build system for any other purpose." )
+    message (WARNING "ERROR: No suitable polling mechanism found.")
+endif ()
+
+# Select the interface mechanism
+if (${NN_HAVE_GETIFADDRS})
+	add_definitions (-DNN_USE_IFADDRS)
+elseif (${NN_HAVE_SIOCGIFADDR})
+	add_definitions (-DNN_USE_SIOCGIFADDR)
+else ()
+	add_definitions (-DNN_USE_LITERAL_IFADDR)
+endif ()
+
+# Selct event mechanism
+if (${NN_HAVE_EVENTFD})
+	add_definitions (-DNN_USE_EVENTFD)
+elseif (${NN_HAVE_PIPE})
+	add_definitions (-DNN_USE_PIPE)
+elseif (${NN_HAVE_SOCKETPAIR})
+	add_definitions (-DNN_USE_SOCKETPAIR)
 endif ()
 
 #  Build the library itself.
@@ -134,5 +253,3 @@ install (TARGETS nanocat RUNTIME DESTINATION bin)
 set (CPACK_GENERATOR "NSIS")
 set (CPACK_PACKAGE_NAME "nanomsg")
 include (CPack)
-
-
